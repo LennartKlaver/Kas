@@ -7,6 +7,7 @@ class Log{
     private $tablename = "Log";
 
     //Table fields.
+    public $id;
     public $date;
     public $remoteip;
     public $xforward;

@@ -6,6 +6,7 @@ class Measurement{
     private $tablename = "measurements";
 
     //Table fields.
+    public $id;
     public $date;
     public $temperature;
     public $moisture;
@@ -44,6 +45,12 @@ class Measurement{
      * Read
      */
     public function read(){
+        $query = "SELECT * FROM " . $this->tablename;
+        $stmt = $this->connection->query($query);
+        //$stmt = $this->connection->prepare($query);
+       // $stmt->execute();
+
+        return $stmt;
     }
 
     /**

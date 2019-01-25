@@ -2,9 +2,9 @@
 
 class DB {
     private $host = "localhost";
-    private $username = "kas_account";
-    private $password = "Npp9dRWx6cQXcdfZkDDHTfwA";
-    private $database = "db_kas";
+    private $username = "itpweb_nl_dbkas";
+    private $password = "FRTKD4XkMBut";
+    private $database = "itpweb_nl_dbkas";
 
     public $connection;
 
