@@ -3,11 +3,14 @@
  * Kascontroller INKA4.0.
  * Copyright (c) 2019 Lennart Klaver.
  * Software released under MIT license. 
+ * 
+ * Uses ArduinoJson library 5.13.4 by Benoit Blanchon.
  */
 /* INCLUDES */
 #include "DHTesp.h"
 #include "ESP8266WiFi.h"
 #include <ESP8266HTTPClient.h>
+#include "ArduinoJson.h"
 
 /* DEFINES */
 //Stepper
@@ -118,10 +121,38 @@ void wifiConnect() {
 /* Send statistics to the server.
  */
 void sendStatistics(){
- /* HTTPClient http;
-  http.begin("http://www.google.nl");
-  //http.addHeader("Content-Type", "application/json");
-  int httpCode = http.GET();
+  /*
+   * {
+    "device": "kas1",
+    "measurement": {
+        "temperature": 19,
+        "moisture": 25,
+        "humidity": 23,
+        "light": 1
+    }
+    }
+   */
+
+  DynamicJsonBuffer JSONbuffer;
+  JsonObject& root = JSONbuffer.createObject();
+  root["device"] = "kas1";
+
+  JsonObject& measurement = root.createNestedObject("measurement");
+  measurement["temperature"] = getTemperature();
+  measurement["moisture"] = getMoistureLevel();
+  measurement["humidity"] = getHumidity();
+  measurement["light"] = isDark();
+  measurement["distance"] = getDistance();
+  measurement["water"] = 0;
+
+  char msg[300];
+  root.prettyPrintTo(msg, sizeof(msg));
+  //Serial.println(msg);
+  
+  HTTPClient http;
+  http.begin("https://kas.itpweb.nl/measurement/read.php?key=XSYUqxMRRMaJ5TeskMUKdxwmzATWaeJLpMVya59YLehF2gUw","70BF01D89766C12A558D2BC0B6ABCCB24384688D");
+  http.addHeader("Content-Type", "application/json");
+  int httpCode = http.POST(msg);
   Serial.println(httpCode);
   if(httpCode == HTTP_CODE_OK) {
     Serial.print("HTTP response code ");
@@ -129,7 +160,7 @@ void sendStatistics(){
     String response = http.getString();
     Serial.println(response);
   }
-  http.end();*/
+  http.end();
 }
 
 /* getMoistureLevel
