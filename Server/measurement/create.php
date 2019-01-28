@@ -61,11 +61,11 @@ try {
         $measurement = new Measurement($connection);
 		// Sanitize input.
         $measurement->date = date('Y-m-d H:i:s');
-        $measurement->temperature = filter_var($measurements['temperature'],FILTER_SANITIZE_NUMBER_FLOAT);
+        $measurement->temperature = filter_var($measurements['temperature'],FILTER_SANITIZE_NUMBER_FLOAT,FILTER_FLAG_ALLOW_FRACTION);
 		$measurement->moisture = filter_var($measurements['moisture'],FILTER_SANITIZE_NUMBER_INT);
-		$measurement->humidity = filter_var($measurements['humidity'],FILTER_SANITIZE_NUMBER_FLOAT);
+		$measurement->humidity = filter_var($measurements['humidity'],FILTER_SANITIZE_NUMBER_FLOAT,FILTER_FLAG_ALLOW_FRACTION);
 		$measurement->light = filter_var($measurements['light'],FILTER_SANITIZE_NUMBER_INT);
-		$measurement->distance = filter_var($measurements['distance'],FILTER_SANITIZE_NUMBER_FLOAT);
+		$measurement->distance = filter_var($measurements['distance'],FILTER_SANITIZE_NUMBER_FLOAT,FILTER_FLAG_ALLOW_FRACTION);
 		$measurement->water = filter_var($measurements['water'],FILTER_SANITIZE_NUMBER_INT);
         // Send to database.
         $measurement->create();
