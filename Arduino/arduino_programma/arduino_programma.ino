@@ -7,9 +7,14 @@
  * Uses ArduinoJson library 5.13.4 by Benoit Blanchon.
  */
 /* INCLUDES */
-#include "DHTesp.h"
-#include "ESP8266WiFi.h"
+//WiFi
+#include <Arduino.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266WiFiMulti.h>
 #include <ESP8266HTTPClient.h>
+#include <WiFiClientSecureBearSSL.h>
+//Other
+#include "DHTesp.h"
 #include "ArduinoJson.h"
 
 /* DEFINES */
@@ -29,9 +34,8 @@
 //Sonar
 #define SONARTRIGPIN D8
 #define SONARDATAPIN D7
-//WiFi
-#define WIFI_SSID "KLAVER"
-#define WIFI_PASSWORD "WIFIKLAVER1713"
+//Wifi
+#define JSONMSGLEN 350
 
 /* FUNCTION PROTOTYPES */
 int getMoistureLevel();
@@ -48,6 +52,9 @@ void rotateRight();
 void disablePump();
 void enablePump();
 void doGiveWater(); 
+void wifisetup();
+void sendToSite(char *);
+void getStatisticsJSON(char *,unsigned int);
 
 /* GLOBAL VARIABLES */
 DHTesp dht;
@@ -59,7 +66,11 @@ unsigned long ulDesiredStepDelay = 0;
 unsigned long ulStepDelay = 0;
 unsigned long ulLastStepTime = 0;
 unsigned long ulLastRampTime = 0;
-WiFiClient client;
+//Wifi
+// Fingerprint for demo URL, expires on June 2, 2019, needs to be updated well before this date
+const uint8_t fingerprint[20] = {0xD1, 0x45, 0x7D, 0x49, 0x7B, 0x99, 0xF6, 0x4C, 0x14, 0xFE, 0x97, 0x2F, 0xC0, 0x9A, 0xA1, 0xA3, 0xDC, 0x77, 0x01, 0x8C};
+ESP8266WiFiMulti WiFiMulti;
+unsigned int counter;
 
 /* INIT */ 
 void setup() {
@@ -76,23 +87,46 @@ void setup() {
 
   //Init de dht temperatuur sensor.
   dht.setup(DHT11DATAPIN, DHTesp::DHT11);
+  
+  Serial.begin(115200);
+  Serial.println();
+  Serial.println();
+  Serial.println();
 
-  //Start seriele poort voor info.
-  Serial.begin(9600);
+  for (uint8_t t = 4; t > 0; t--) {
+    Serial.printf("[SETUP] WAIT %d...\n", t);
+    Serial.flush();
+    delay(1000);
+  }
 
-  //Start wifi.
-  Serial.println("starting");
-  WiFi.disconnect();
-  Serial.println("disconnected");
-  wifiConnect();
-  Serial.println("Connected");
-  Serial.println("googling");
-  sendStatistics();
-  Serial.println("done");
+  wifisetup();
+
+  // wait for WiFi connection
+  if ((WiFiMulti.run() != WL_CONNECTED)) {
+    Serial.print(".");
+  }
+  Serial.println();
+ 
 }
 
 /* MAIN */
 void loop() {
+  char jsonmsg[JSONMSGLEN];
+
+  // Send statistics after x minutes.
+  Serial.println(counter);
+  if(counter >= 4){
+    counter = 0;
+
+    Serial.println("start");
+    //Get the JSON.
+    getStatisticsJSON(jsonmsg, JSONMSGLEN);
+    Serial.println(jsonmsg);
+
+    //Send them.
+    sendToSite(jsonmsg);
+  }
+  
   Serial.println((String) "m:" + getMoistureLevel() + " d:" + getDistance() + " l:" + isDark() + " t:" + getTemperature() + " h:" + getHumidity());
 
   //Check if the soil is dry.
@@ -100,42 +134,63 @@ void loop() {
     Serial.println("Wetting...");
     //Yes it is dry, give some water.
     doGiveWater(); 
-    //Wait some time to let the water flow.
-    delay(10000);
   }
-
-  delay(5000);
+  //Wait some time to let the water flow.
+  delay(15000);
+  counter++;
 }
 
 /* Do connect to the WiFi.
  */
-void wifiConnect() {
-  Serial.print("Connecting to AP");
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.print(".");
-  }
+void wifisetup(){
+  WiFi.mode(WIFI_STA);
+  WiFiMulti.addAP("KLAVER", "WIFIKLAVER1713");  
 }
+
+void sendToSite(char * msg){
+
+    std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
+
+    client->setFingerprint(fingerprint);
+
+    HTTPClient https;
+
+    Serial.print("[HTTPS] begin...\n");
+    if (https.begin(*client, "https://kas.itpweb.nl/measurement/create.php")) {  // HTTPS
+      https.addHeader("Content-Type", "application/json");
+
+      Serial.print("[HTTPS] GET...\n");
+      // start connection and send HTTP header
+      //int httpCode = https.POST("{\"apikey\":\"XSYUqxMRRMaJ5TeskMUKdxwmzATWaeJLpMVya59YLehF2gUw\",\"measurement\":{\"temperature\":19,\"moisture\":25,\"humidity\":23,\"light\":1,\"distance\":10}}");
+      int httpCode = https.POST(msg);
+
+      // httpCode will be negative on error
+      if (httpCode > 0) {
+        // HTTP header has been send and Server response header has been handled
+        Serial.printf("[HTTPS] GET... code: %d\n", httpCode);
+
+        // file found at server
+        if (httpCode == HTTP_CODE_OK || httpCode == HTTP_CODE_MOVED_PERMANENTLY) {
+          String payload = https.getString();
+          Serial.println(payload);
+        }
+      } else {
+        Serial.printf("[HTTPS] GET... failed, error: %s\n", https.errorToString(httpCode).c_str());
+      }
+
+      https.end();
+    } else {
+      Serial.printf("[HTTPS] Unable to connect\n");
+    }  
+}
+
 
 /* Send statistics to the server.
  */
-void sendStatistics(){
-  /*
-   * {
-    "device": "kas1",
-    "measurement": {
-        "temperature": 19,
-        "moisture": 25,
-        "humidity": 23,
-        "light": 1
-    }
-    }
-   */
-
+void getStatisticsJSON(char * result, unsigned int len){
   DynamicJsonBuffer JSONbuffer;
   JsonObject& root = JSONbuffer.createObject();
-  root["device"] = "kas1";
+  root["apikey"] = "XSYUqxMRRMaJ5TeskMUKdxwmzATWaeJLpMVya59YLehF2gUw";
 
   JsonObject& measurement = root.createNestedObject("measurement");
   measurement["temperature"] = getTemperature();
@@ -145,22 +200,8 @@ void sendStatistics(){
   measurement["distance"] = getDistance();
   measurement["water"] = 0;
 
-  char msg[300];
-  root.prettyPrintTo(msg, sizeof(msg));
-  //Serial.println(msg);
-  
-  HTTPClient http;
-  http.begin("https://kas.itpweb.nl/measurement/read.php?key=XSYUqxMRRMaJ5TeskMUKdxwmzATWaeJLpMVya59YLehF2gUw","70BF01D89766C12A558D2BC0B6ABCCB24384688D");
-  http.addHeader("Content-Type", "application/json");
-  int httpCode = http.POST(msg);
-  Serial.println(httpCode);
-  if(httpCode == HTTP_CODE_OK) {
-    Serial.print("HTTP response code ");
-    Serial.println(httpCode);
-    String response = http.getString();
-    Serial.println(response);
-  }
-  http.end();
+  //To string.
+  root.prettyPrintTo(result, len);
 }
 
 /* getMoistureLevel
