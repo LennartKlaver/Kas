@@ -4,9 +4,9 @@ include_once "../library/models/Measurement.php";
 include_once "../library/models/Log.php";
 include_once "../library/DB.php";
 
-/*POST localhost/JSON/measurement/create.php?key=XSYUqxMRRMaJ5TeskMUKdxwmzATWaeJLpMVya59YLehF2gUw
+/*POST localhost/JSON/measurement/create.php
     {
-        "device": "kas1",
+		"apikey": "XSYUqxMRRMaJ5TeskMUKdxwmzATWaeJLpMVya59YLehF2gUw",
         "measurement": {
             "temperature": 19.0,
             "moisture": 25,
@@ -16,16 +16,7 @@ include_once "../library/DB.php";
         }
     }
 */
-try {
-	if (!($key = filter_input(INPUT_GET, 'key', FILTER_SANITIZE_STRING))) {
-		throw new Exception('No API key specified!'); 
-	}
-
-	//Check the API key for authentication.
-	if ($key != "XSYUqxMRRMaJ5TeskMUKdxwmzATWaeJLpMVya59YLehF2gUw"){
-		throw new Exception('Invalid API key!');
-	}
-	 
+try { 
 	//Make sure that it is a POST request.
 	if(strcasecmp($_SERVER['REQUEST_METHOD'], 'POST') != 0){
 		throw new Exception('Request method must be POST!');
@@ -53,7 +44,13 @@ try {
     }
  
 	//Process the JSON.
-    $jsonarray = new JSONArray($input,"");
+	$jsonarray = new JSONArray($input,"");
+	
+	//Check the API key for authentication.
+	if ($jsonarray['apikey'] != "XSYUqxMRRMaJ5TeskMUKdxwmzATWaeJLpMVya59YLehF2gUw"){
+		throw new Exception('Invalid API key!');
+	}
+
     $measurements = new JSONArray($jsonarray['measurement'], 0);
 
 	try {
@@ -79,14 +76,16 @@ try {
 		$log->remoteip = $_SERVER['REMOTE_ADDR'];
         $log->xforward = array_key_exists('HTTP_X_FORWARDED_FOR', $_SERVER) ? $_SERVER['HTTP_X_FORWARDED_FOR'] : "";
         // Send to database.
-        $log->create();
+		$log->create();
 		
+		echo json_encode(array('state' => 'success')); //200 OK.		
 	}
 	catch(PDOException $e){
 		throw $e;
 	}
 }
 catch(Exception $e){
-	echo "";
+	echo json_encode(array('state' => 'error')); //500 INTERNAL ERROR.
+	//echo 'Caught exception: ',  $e->getMessage(), "\n";
 }
 ?>
