@@ -31,12 +31,25 @@ void setup() {
     delay(1000);
   }
 
-  WiFi.mode(WIFI_STA);
-  WiFiMulti.addAP("KLAVER", "WIFIKLAVER1713");
-
+  wifisetup();
 
   // wait for WiFi connection
-  if ((WiFiMulti.run() == WL_CONNECTED)) {
+  if ((WiFiMulti.run() != WL_CONNECTED)) {
+    Serial.print(".");
+  }
+  Serial.println();
+  
+  sendToSite();
+
+  delay(10000);
+}
+
+void wifisetup(){
+  WiFi.mode(WIFI_STA);
+  WiFiMulti.addAP("KLAVER", "WIFIKLAVER1713");  
+}
+
+void sendToSite(){
 
     std::unique_ptr<BearSSL::WiFiClientSecure>client(new BearSSL::WiFiClientSecure);
 
@@ -69,10 +82,7 @@ void setup() {
       https.end();
     } else {
       Serial.printf("[HTTPS] Unable to connect\n");
-    }
-  }
-
-  delay(10000);
+    }  
 }
 
 void loop() {
