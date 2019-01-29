@@ -115,7 +115,7 @@ void loop() {
 
   // Send statistics after x minutes.
   Serial.println(counter);
-  if(counter >= 4){
+  if(counter >= 40){
     counter = 0;
 
     Serial.println("start");
